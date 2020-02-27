@@ -121,6 +121,7 @@ npm-show-proxy ()
 		echo "==="
 		echo "npm HTTP  proxy: " `npm config get proxy`
 		echo "npm HTTPS proxy: " `npm config get https-proxy`
+		echo "npm proxy exceptions: " `npm config get noproxy`
 	fi
 }
 
@@ -132,6 +133,7 @@ npm-disable-proxy ()
 	if $(command -v npm &> /dev/null) ; then
 		npm config delete proxy
 		npm config delete https-proxy
+		npm config delete noproxy
 		echo "Disabled npm proxy settings"
 	fi
 }
@@ -143,10 +145,12 @@ npm-enable-proxy ()
 
 	local my_http_proxy=${1:-$BASH_IT_HTTP_PROXY}
 	local my_https_proxy=${2:-$BASH_IT_HTTPS_PROXY}
+	local my_no_proxy=${3:-$BASH_IT_NO_PROXY}
 
 	if $(command -v npm &> /dev/null) ; then
 		npm config set proxy $my_http_proxy
 		npm config set https-proxy $my_https_proxy
+		npm config set noproxy $my_no_proxy
 		echo "Enabled npm proxy settings"
 	fi
 }
@@ -236,11 +240,11 @@ svn-show-proxy ()
 	about 'Shows SVN proxy settings'
 	group 'proxy'
 
-	if $(command -v svn &> /dev/null) && $(command -v python &> /dev/null) ; then
+	if $(command -v svn &> /dev/null) && $(command -v python2 &> /dev/null) ; then
 		echo ""
 		echo "SVN Proxy Settings"
 		echo "=================="
-		python - <<END
+		python2 - <<END
 import ConfigParser, os
 config = ConfigParser.ConfigParser()
 config.read(os.path.expanduser('~/.subversion/servers'))
@@ -266,8 +270,8 @@ svn-disable-proxy ()
 	about 'Disables SVN proxy settings'
 	group 'proxy'
 
-	if $(command -v svn &> /dev/null) && $(command -v python &> /dev/null) ; then
-		python - <<END
+	if $(command -v svn &> /dev/null) && $(command -v python2 &> /dev/null) ; then
+		python2 - <<END
 import ConfigParser, os
 config = ConfigParser.ConfigParser()
 config.read(os.path.expanduser('~/.subversion/servers'))
@@ -295,10 +299,10 @@ svn-enable-proxy ()
 	about 'Enables SVN proxy settings'
 	group 'proxy'
 
-	if $(command -v svn &> /dev/null) && $(command -v python &> /dev/null) ; then
+	if $(command -v svn &> /dev/null) && $(command -v python2 &> /dev/null) ; then
 		local my_http_proxy=${1:-$BASH_IT_HTTP_PROXY}
 
-		python - "$my_http_proxy" "$BASH_IT_NO_PROXY" <<END
+		python2 - "$my_http_proxy" "$BASH_IT_NO_PROXY" <<END
 import ConfigParser, os, sys, urlparse
 pieces = urlparse.urlparse(sys.argv[1])
 host = pieces.hostname
@@ -370,7 +374,7 @@ ssh-disable-proxy ()
 	group 'proxy'
 
 	if [ -f ~/.ssh/config ] ; then
-		sed -e's/^.*ProxyCommand/#	ProxyCommand/' -i ""  ~/.ssh/config
+		sed -e's/^.*ProxyCommand/#	ProxyCommand/' "${BASH_IT_SED_I_PARAMETERS[@]}"  ~/.ssh/config
 		echo "Disabled SSH config proxy settings"
 	fi
 }
@@ -382,7 +386,7 @@ ssh-enable-proxy ()
 	group 'proxy'
 
 	if [ -f ~/.ssh/config ] ; then
-		sed -e's/#	ProxyCommand/	ProxyCommand/' -i ""  ~/.ssh/config
+		sed -e's/#	ProxyCommand/	ProxyCommand/' "${BASH_IT_SED_I_PARAMETERS[@]}"  ~/.ssh/config
 		echo "Enabled SSH config proxy settings"
 	fi
 }

@@ -29,7 +29,7 @@ function alias_completion {
     (( ${#completions[@]} == 0 )) && return 0
 
     # create temporary file for wrapper functions and completions
-    local tmp_file; tmp_file="$(mktemp -t "${namespace}-${RANDOM}XXX.tmp")" || return 1
+    local tmp_file; tmp_file="$(mktemp -t "${namespace}-${RANDOM}XXXXXX")" || return 1
 
     local completion_loader; completion_loader="$(complete -p -D 2>/dev/null | sed -Ene 's/.* -F ([^ ]*).*/\1/p')"
 
@@ -56,13 +56,20 @@ function alias_completion {
                 continue
             fi
         fi
-        local new_completion="$(complete -p "$alias_cmd")"
+        local new_completion="$(complete -p "$alias_cmd" 2>/dev/null)"
 
         # create a wrapper inserting the alias arguments if any
         if [[ -n $alias_args ]]; then
             local compl_func="${new_completion/#* -F /}"; compl_func="${compl_func%% *}"
             # avoid recursive call loops by ignoring our own functions
             if [[ "${compl_func#_$namespace::}" == $compl_func ]]; then
+                # the completion function stored in compl_func may need argument(s),
+                # in which case they should be provided in compl_func_args (see #1497)
+                local compl_func_args=
+                if [[ $compl_func == _filedir_xspec ]]; then
+                    compl_func_args=$alias_cmd
+                fi
+
                 local compl_wrapper="_${namespace}::${alias_name}"
                     echo "function $compl_wrapper {
                         (( COMP_CWORD += ${#alias_arg_words[@]} ))
@@ -70,15 +77,17 @@ function alias_completion {
                         (( COMP_POINT -= \${#COMP_LINE} ))
                         COMP_LINE=\${COMP_LINE/$alias_name/$alias_cmd $alias_args}
                         (( COMP_POINT += \${#COMP_LINE} ))
-                        $compl_func
+                        $compl_func $compl_func_args
                     }" >> "$tmp_file"
                     new_completion="${new_completion/ -F $compl_func / -F $compl_wrapper }"
             fi
         fi
 
         # replace completion trigger by alias
-        new_completion="${new_completion% *} $alias_name"
-        echo "$new_completion" >> "$tmp_file"
+        if [[ -n $new_completion ]]; then
+            new_completion="${new_completion% *} $alias_name"
+            echo "$new_completion" >> "$tmp_file"
+        fi
     done < <(alias -p | sed -Ene "s/$alias_regex/\2 '\3' '\4'/p")
     source "$tmp_file" && rm -f "$tmp_file"
 }; alias_completion
